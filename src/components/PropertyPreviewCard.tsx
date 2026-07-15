@@ -15,22 +15,19 @@ interface PropertyPreviewCardProps {
   onClose: () => void;
   onViewDetails?: (id: string) => void;
   isMobile?: boolean;
+  savedPropertyIds: string[];
+  onToggleSave: (propertyId: string) => void;
 }
 
 export default function PropertyPreviewCard({
   property,
   onClose,
   onViewDetails,
-  isMobile = false
+  isMobile = false,
+  savedPropertyIds,
+  onToggleSave
 }: PropertyPreviewCardProps) {
-  const [isSaved, setIsSaved] = React.useState(false);
-
-  // Read saved state on mount/change
-  React.useEffect(() => {
-    if (!property) return;
-    const saved = localStorage.getItem(`saved_prop_${property.id}`);
-    setIsSaved(saved === 'true');
-  }, [property]);
+  const isSaved = property ? savedPropertyIds.includes(property.id) : false;
 
   if (!property) return null;
 
@@ -93,9 +90,9 @@ export default function PropertyPreviewCard({
   // Handle wishlist toggle
   const handleToggleSave = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const nextSavedState = !isSaved;
-    setIsSaved(nextSavedState);
-    localStorage.setItem(`saved_prop_${property.id}`, nextSavedState ? 'true' : 'false');
+    if (property) {
+      onToggleSave(property.id);
+    }
   };
 
   // Gallery list construction (Ensure there's a second image to peek and scroll to)
@@ -171,7 +168,7 @@ export default function PropertyPreviewCard({
 
       {/* 2. Content Panel - Tight Padding */}
       <div className="p-3.5 flex-1 flex flex-col justify-between">
-        <div className="flex justify-between items-start space-x-2">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0 sm:space-x-2">
           {/* Left content column */}
           <div className="space-y-1 flex-1 min-w-0">
             {/* Title */}
@@ -202,25 +199,26 @@ export default function PropertyPreviewCard({
             </div>
           </div>
 
-          {/* Right Actions column - Row layout next to each other like Google Maps card */}
-          <div className="flex items-center space-x-1.5 shrink-0 pt-0.5">
+          {/* Right Actions column */}
+          <div className="flex items-center space-x-2 shrink-0 pt-1 sm:pt-0.5">
             {/* Directions Button */}
             <a
               href={`https://www.google.com/maps/dir/?api=1&destination=${property.latitude},${property.longitude}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-8 h-8 rounded-full bg-emerald-50 text-brand-green border border-emerald-100/50 hover:bg-emerald-100 hover:text-emerald-900 active:scale-95 transition-all flex items-center justify-center shadow-sm cursor-pointer pointer-events-auto"
+              className="flex-1 sm:flex-none h-8 rounded-full sm:w-8 bg-emerald-50 text-brand-green border border-emerald-100/50 hover:bg-emerald-100 hover:text-emerald-900 active:scale-95 transition-all flex items-center justify-center shadow-sm cursor-pointer pointer-events-auto px-3 sm:px-0 gap-1.5"
               title="Directions"
               id={`btn-directions-${property.id}`}
               onClick={(e) => e.stopPropagation()}
             >
               <Navigation className="w-3.5 h-3.5 fill-current rotate-45 translate-x-[0.5px] -translate-y-[0.5px]" />
+              <span className="text-[10px] font-bold sm:hidden">Directions</span>
             </a>
 
             {/* Save / Bookmark Button */}
             <button
               onClick={handleToggleSave}
-              className={`w-8 h-8 rounded-full border active:scale-95 transition-all flex items-center justify-center shadow-sm cursor-pointer pointer-events-auto ${
+              className={`flex-1 sm:flex-none h-8 rounded-full sm:w-8 border active:scale-95 transition-all flex items-center justify-center shadow-sm cursor-pointer pointer-events-auto px-3 sm:px-0 gap-1.5 ${
                 isSaved 
                   ? 'bg-amber-50 text-amber-500 border-amber-200 hover:bg-amber-100' 
                   : 'bg-neutral-50 text-neutral-400 border-neutral-200/60 hover:bg-neutral-100'
@@ -229,6 +227,7 @@ export default function PropertyPreviewCard({
               id={`btn-bookmark-${property.id}`}
             >
               <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-current' : ''}`} />
+              <span className="text-[10px] font-bold sm:hidden">{isSaved ? 'Saved' : 'Save'}</span>
             </button>
           </div>
         </div>

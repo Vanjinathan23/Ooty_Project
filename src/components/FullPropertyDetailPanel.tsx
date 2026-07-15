@@ -34,6 +34,10 @@ interface FullPropertyDetailPanelProps {
   onClose: () => void;
   onOpenEnquiry: (propertyName: string) => void;
   isMobile?: boolean;
+  user: any;
+  savedPropertyIds: string[];
+  onToggleSave: (propertyId: string) => void;
+  onTriggerAuth: (message: string, pendingAction: any) => void;
 }
 
 // Default reviews seeded for each of the 12 properties
@@ -103,10 +107,13 @@ export default function FullPropertyDetailPanel({
   property,
   onClose,
   onOpenEnquiry,
-  isMobile = false
+  isMobile = false,
+  user,
+  savedPropertyIds,
+  onToggleSave,
+  onTriggerAuth
 }: FullPropertyDetailPanelProps) {
   const [activeTab, setActiveTab] = React.useState<'overview' | 'specifications' | 'documents' | 'reviews'>('overview');
-  const [isSaved, setIsSaved] = React.useState(false);
   const [showGallery, setShowGallery] = React.useState(false);
   const [openGalleryToVideo, setOpenGalleryToVideo] = React.useState(false);
   const [galleryIndex, setGalleryIndex] = React.useState(0);
@@ -119,13 +126,19 @@ export default function FullPropertyDetailPanel({
   const [reviewRating, setReviewRating] = React.useState(5);
   const [reviewComment, setReviewComment] = React.useState('');
 
-  // Synchronize wishlist state and reviews on property change
+  const isSaved = property ? savedPropertyIds.includes(property.id) : false;
+
+  // Autofill name from profile
+  React.useEffect(() => {
+    if (user && !reviewName) {
+      const name = user.user_metadata?.full_name || user.email?.split('@')[0] || '';
+      setReviewName(name);
+    }
+  }, [user]);
+
+  // Synchronize reviews on property change
   React.useEffect(() => {
     if (!property) return;
-
-    // Save state
-    const saved = localStorage.getItem(`saved_prop_${property.id}`);
-    setIsSaved(saved === 'true');
 
     // Reviews state
     const localKey = `reviews_prop_${property.id}`;
@@ -157,9 +170,9 @@ export default function FullPropertyDetailPanel({
 
   // Handle Save
   const handleToggleSave = () => {
-    const nextSaved = !isSaved;
-    setIsSaved(nextSaved);
-    localStorage.setItem(`saved_prop_${property.id}`, nextSaved ? 'true' : 'false');
+    if (property) {
+      onToggleSave(property.id);
+    }
   };
 
   // Handle Share
@@ -186,6 +199,21 @@ export default function FullPropertyDetailPanel({
     e.preventDefault();
     if (!reviewName.trim() || !reviewComment.trim()) return;
 
+    if (!user) {
+      if (property) {
+        onTriggerAuth("Sign in to leave a review", {
+          type: 'review',
+          propertyId: property.id,
+          reviewData: {
+            name: reviewName.trim(),
+            rating: reviewRating,
+            comment: reviewComment.trim()
+          }
+        });
+      }
+      return;
+    }
+
     const newReview = {
       name: reviewName.trim(),
       rating: reviewRating,
@@ -198,7 +226,12 @@ export default function FullPropertyDetailPanel({
     localStorage.setItem(`reviews_prop_${property.id}`, JSON.stringify(nextReviews));
 
     // Clear form
-    setReviewName('');
+    if (user) {
+      const name = user.user_metadata?.full_name || user.email?.split('@')[0] || '';
+      setReviewName(name);
+    } else {
+      setReviewName('');
+    }
     setReviewRating(5);
     setReviewComment('');
   };
@@ -305,7 +338,7 @@ export default function FullPropertyDetailPanel({
           className={`fixed z-50 bg-white shadow-2xl flex flex-col font-sans overflow-hidden border-gray-100 ${
             isMobile 
               ? 'bottom-0 left-0 right-0 h-[88vh] rounded-t-3xl border-t' 
-              : 'top-0 bottom-0 right-0 w-[450px] md:w-[480px] h-full border-l'
+              : 'top-4 bottom-4 right-4 w-[55vw] lg:w-[450px] rounded-2xl border'
           }`}
           id="full-property-detail-panel"
         >
@@ -470,7 +503,7 @@ export default function FullPropertyDetailPanel({
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`py-3 text-xs font-semibold tracking-wider uppercase border-b-2 -mb-px relative z-10 transition-all cursor-pointer focus:outline-none whitespace-nowrap ${
+                    className={`py-3 text-xs font-semibold tracking-wider uppercase border-b-2 -mb-px relative z-10 transition-all cursor-pointer focus:outline-none whitespace-nowrap shrink-0 ${
                       activeTab === tab
                         ? 'border-brand-green text-brand-green font-bold'
                         : 'border-transparent text-neutral-400 hover:text-neutral-600 hover:border-neutral-300'
@@ -691,7 +724,27 @@ export default function FullPropertyDetailPanel({
                         <MessageSquare className="w-3.5 h-3.5 mr-1.5 text-brand-green" />
                         Write a review
                       </h4>
-                      <form onSubmit={handleReviewSubmit} className="space-y-3">
+                      <form 
+                        onSubmit={handleReviewSubmit} 
+                        className="space-y-3"
+                        onClick={(e) => {
+                          if (!user) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (property) {
+                              onTriggerAuth("Sign in to leave a review", {
+                                type: 'review',
+                                propertyId: property.id,
+                                reviewData: {
+                                  name: reviewName,
+                                  rating: reviewRating,
+                                  comment: reviewComment
+                                }
+                              });
+                            }
+                          }
+                        }}
+                      >
                         <div className="grid grid-cols-1 gap-3">
                           {/* Name input */}
                           <input

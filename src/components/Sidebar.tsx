@@ -58,7 +58,7 @@ export default function Sidebar({
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-            className="fixed top-0 bottom-0 left-0 w-80 sm:w-96 bg-white shadow-2xl z-50 flex flex-col overflow-hidden font-sans border-r border-gray-100"
+            className="fixed top-0 bottom-0 left-0 w-full sm:w-11/12 md:w-2/3 lg:w-96 bg-white shadow-2xl z-50 flex flex-col overflow-hidden font-sans border-r border-gray-100"
             id="sidebar-drawer"
           >
             {/* Header */}

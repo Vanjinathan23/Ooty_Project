@@ -210,7 +210,7 @@ export default function SearchBar({
               return (
                 <div
                   key={property.id}
-                  className="px-5 py-3 flex items-center justify-between hover:bg-neutral-50 transition-colors group cursor-pointer"
+                  className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-neutral-50 transition-colors group cursor-pointer gap-2 sm:gap-0"
                   onMouseEnter={() => onHoverProperty(property.id)}
                   onMouseLeave={() => onHoverProperty(null)}
                   onClick={() => {
@@ -220,7 +220,7 @@ export default function SearchBar({
                   id={`search-row-${property.id}`}
                 >
                   {/* Left Column: Color Dot + Content */}
-                  <div className="flex items-start space-x-3 flex-1 min-w-0 pr-3">
+                  <div className="flex items-start space-x-3 flex-1 min-w-0 pr-0 sm:pr-3">
                     <span className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${dotColor}`} />
                     
                     <div className="flex flex-col space-y-0.5 min-w-0">
@@ -237,7 +237,7 @@ export default function SearchBar({
                   </div>
 
                   {/* Right Column: Price & Interactive Buttons */}
-                  <div className="flex items-center space-x-2 shrink-0">
+                  <div className="flex items-center space-x-2 shrink-0 self-start sm:self-auto pl-5 sm:pl-0 w-full sm:w-auto justify-between sm:justify-end">
                     <span className="text-xs font-mono font-bold text-neutral-800 pr-1">
                       {new Intl.NumberFormat('en-IN', {
                         style: 'currency',

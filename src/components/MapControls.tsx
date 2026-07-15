@@ -7,7 +7,8 @@ import {
   Map, 
   AlertCircle,
   X,
-  Target
+  Target,
+  Navigation
 } from 'lucide-react';
 import { MapStyleId } from '../types';
 
@@ -28,6 +29,7 @@ export default function MapControls({
 }: MapControlsProps) {
   const [bearing, setBearing] = React.useState(0);
   const [pitch, setPitch] = React.useState(0);
+  const [currentZoom, setCurrentZoom] = React.useState(11.2);
   const [isLocating, setIsLocating] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
   const [showStyleMenu, setShowStyleMenu] = React.useState(false);
@@ -36,17 +38,25 @@ export default function MapControls({
   React.useEffect(() => {
     if (!map) return;
 
+    setCurrentZoom(map.getZoom());
+
     const handleMapMovement = () => {
       setBearing(map.getBearing());
       setPitch(map.getPitch());
     };
 
+    const handleZoom = () => {
+      setCurrentZoom(map.getZoom());
+    };
+
     map.on('rotate', handleMapMovement);
     map.on('pitch', handleMapMovement);
+    map.on('zoom', handleZoom);
 
     return () => {
       map.off('rotate', handleMapMovement);
       map.off('pitch', handleMapMovement);
+      map.off('zoom', handleZoom);
     };
   }, [map]);
 
@@ -110,6 +120,7 @@ export default function MapControls({
             duration: 1200,
             essential: true
           });
+          showToast("Zoomed to your location");
         } else {
           showToast("You're outside our coverage area");
         }
@@ -118,19 +129,24 @@ export default function MapControls({
         setIsLocating(false);
         let errorMsg = "Could not retrieve your location";
         if (error.code === error.PERMISSION_DENIED) {
-          errorMsg = "Location permission denied";
+          errorMsg = "Location permission denied — please allow access in your browser";
+        } else if (error.code === error.TIMEOUT) {
+          errorMsg = "Location request timed out";
         }
         showToast(errorMsg);
       },
-      { enableHighAccuracy: true, timeout: 6000 }
+      { enableHighAccuracy: true, timeout: 8000 }
     );
   };
 
   // Check if compass is active (rotated or tilted)
   const isCompassActive = Math.abs(bearing) > 0.5 || pitch > 0.5;
+  
+  const currentMaxZoom = activeStyle === 'satellite' ? 17 : 18;
+  const isAtMaxZoom = currentZoom >= currentMaxZoom - 0.01;
 
   return (
-    <div className="absolute inset-0 pointer-events-none font-sans" id="map-controls-overlay">
+    <div className="absolute inset-0 pointer-events-none font-sans z-30" id="map-controls-overlay">
       
       {/* 1. Compass Button (Top Right) */}
       <div className="absolute top-24 right-4 pointer-events-auto" id="compass-control-container">
@@ -141,7 +157,7 @@ export default function MapControls({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               onClick={handleResetCompass}
-              className="p-3 bg-white rounded-xl shadow-lg border border-gray-100 text-brand-charcoal hover:bg-gray-50 active:bg-gray-100 transition-all cursor-pointer focus:outline-none flex items-center justify-center"
+              className="p-3 bg-white rounded-xl shadow-lg border border-gray-100 text-brand-charcoal hover:bg-gray-50 active:bg-gray-100 transition-all cursor-pointer focus:outline-none flex items-center justify-center min-w-[44px] min-h-[44px]"
               title="Reset Compass (Point North)"
               aria-label="Reset Compass"
               id="btn-reset-compass"
@@ -190,7 +206,7 @@ export default function MapControls({
               exit={{ opacity: 0, y: 30 }}
               transition={{ type: 'spring', damping: 20, stiffness: 180 }}
               onClick={onReturnToOoty}
-              className="px-5 py-3 bg-brand-terracotta text-white rounded-full font-display font-semibold text-sm shadow-xl flex items-center space-x-2 border border-brand-terracotta/20 hover:bg-brand-terracotta/90 active:scale-95 transition-all cursor-pointer"
+              className="px-5 py-3 bg-brand-terracotta text-white rounded-full font-display font-semibold text-sm shadow-xl flex items-center space-x-2 border border-brand-terracotta/20 hover:bg-brand-terracotta/90 active:scale-95 transition-all cursor-pointer min-w-[44px] min-h-[44px]"
               id="btn-return-to-ooty"
             >
               <Target className="w-4 h-4 animate-spin-slow" />
@@ -210,7 +226,7 @@ export default function MapControls({
           {/* Main Toggle Toggle Button */}
           <button
             onClick={() => setShowStyleMenu(!showStyleMenu)}
-            className="flex items-center space-x-2 bg-white p-2 rounded-xl shadow-lg border border-gray-100 hover:bg-gray-50 active:bg-gray-100 transition-all cursor-pointer focus:outline-none"
+            className="flex items-center space-x-2 bg-white p-2 rounded-xl shadow-lg border border-gray-100 hover:bg-gray-50 active:bg-gray-100 transition-all cursor-pointer focus:outline-none min-w-[44px] min-h-[44px]"
             aria-label="Toggle map styles"
             id="btn-style-selector-trigger"
           >
@@ -254,7 +270,7 @@ export default function MapControls({
                     setActiveStyle('standard');
                     setShowStyleMenu(false);
                   }}
-                  className={`flex flex-col items-center p-1.5 rounded-lg border transition-all cursor-pointer focus:outline-none ${
+                  className={`flex flex-col items-center p-1.5 rounded-lg border transition-all cursor-pointer focus:outline-none min-w-[44px] min-h-[44px] ${
                     activeStyle === 'standard' 
                       ? 'border-brand-green bg-brand-green/5' 
                       : 'border-transparent hover:bg-gray-50'
@@ -271,7 +287,7 @@ export default function MapControls({
                     setActiveStyle('satellite');
                     setShowStyleMenu(false);
                   }}
-                  className={`flex flex-col items-center p-1.5 rounded-lg border transition-all cursor-pointer focus:outline-none ${
+                  className={`flex flex-col items-center p-1.5 rounded-lg border transition-all cursor-pointer focus:outline-none min-w-[44px] min-h-[44px] ${
                     activeStyle === 'satellite' 
                       ? 'border-brand-green bg-brand-green/5' 
                       : 'border-transparent hover:bg-gray-50'
@@ -288,7 +304,7 @@ export default function MapControls({
                     setActiveStyle('dark');
                     setShowStyleMenu(false);
                   }}
-                  className={`flex flex-col items-center p-1.5 rounded-lg border transition-all cursor-pointer focus:outline-none ${
+                  className={`flex flex-col items-center p-1.5 rounded-lg border transition-all cursor-pointer focus:outline-none min-w-[44px] min-h-[44px] ${
                     activeStyle === 'dark' 
                       ? 'border-brand-green bg-brand-green/5' 
                       : 'border-transparent hover:bg-gray-50'
@@ -309,30 +325,31 @@ export default function MapControls({
         {/* My Location Circle Button */}
         <button
           onClick={handleMyLocation}
-          className={`p-3 bg-white rounded-full shadow-lg border border-gray-100 text-brand-charcoal hover:bg-gray-50 active:scale-95 transition-all cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-brand-green/40 ${
+          className={`p-3 bg-white rounded-full shadow-lg border border-gray-100 text-brand-charcoal hover:bg-gray-50 active:scale-95 transition-all cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-brand-green/40 min-w-[44px] min-h-[44px] ${
             isLocating ? 'animate-pulse text-brand-green' : ''
           }`}
           title="Zoom to my location"
           aria-label="My Location"
           id="btn-my-location"
         >
-          <Compass className={`w-5 h-5 ${isLocating ? 'text-brand-green animate-spin' : 'text-gray-600'}`} />
+          <Navigation className={`w-5 h-5 ${isLocating ? 'text-brand-green' : 'text-gray-600'}`} />
         </button>
 
         {/* Zoom Controls + / - (Vertical Rectangle) */}
         <div className="flex flex-col bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden" id="zoom-controls-box">
           <button
             onClick={handleZoomIn}
-            className="p-3 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center justify-center border-b border-gray-100 focus:outline-none focus:bg-gray-50"
+            className={`p-3 transition-colors flex items-center justify-center border-b border-gray-100 focus:outline-none focus:bg-gray-50 min-w-[44px] min-h-[44px] ${isAtMaxZoom ? 'text-gray-300 bg-gray-50 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-50 active:bg-gray-100'}`}
             title="Zoom In"
             aria-label="Zoom In"
             id="btn-zoom-in"
+            disabled={isAtMaxZoom}
           >
             <Plus className="w-5 h-5" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-3 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center justify-center focus:outline-none focus:bg-gray-50"
+            className="p-3 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center justify-center focus:outline-none focus:bg-gray-50 min-w-[44px] min-h-[44px]"
             title="Zoom Out"
             aria-label="Zoom Out"
             id="btn-zoom-out"

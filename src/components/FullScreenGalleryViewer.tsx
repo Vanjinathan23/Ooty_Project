@@ -409,7 +409,7 @@ export default function FullScreenGalleryViewer({
 
       {/* 2. RIGHT PANEL: Sidebar with list of thumbnails (Desktop only) */}
       <div 
-        className="hidden md:flex md:w-[450px] lg:w-[480px] shrink-0 bg-white border-l border-neutral-200 flex-col h-full overflow-hidden text-neutral-800"
+        className="hidden md:flex md:w-[320px] lg:w-[480px] shrink-0 bg-white border-l border-neutral-200 flex-col h-full overflow-hidden text-neutral-800"
         id="desktop-gallery-sidebar"
       >
         {/* Header Row */}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Leaf, MapPin, Home, Layers } from 'lucide-react';
+import { Leaf, MapPin, Home, Layers, Building2 } from 'lucide-react';
 import { PropertyType } from '../types';
 
 interface FilterRowProps {
@@ -20,6 +20,13 @@ export default function FilterRow({
       icon: Layers,
       colorClass: 'text-brand-green',
       activeBg: 'bg-brand-green text-white shadow-brand-green/20'
+    },
+    {
+      id: 'flat',
+      label: 'Flats',
+      icon: Building2,
+      colorClass: 'text-blue-700',
+      activeBg: 'bg-blue-700 text-white shadow-blue-700/20'
     },
     {
       id: 'land',

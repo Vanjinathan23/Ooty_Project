@@ -3,8 +3,7 @@ import maplibregl from 'maplibre-gl';
 import { createPortal } from 'react-dom';
 import { MapStyleId, Property } from '../types';
 import ootyBoundary from '../ooty-boundary.json';
-import CustomMarker, { PropertyCluster } from './CustomMarker';
-import { getClusters } from '../utils/mapUtils';
+import CustomMarker from './CustomMarker';
 import PropertyPreviewCard from './PropertyPreviewCard';
 
 // Construct the Inverse Mask GeoJSON to shade the outside world
@@ -44,7 +43,8 @@ const getSatelliteStyle = () => {
           'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
         ],
         tileSize: 256,
-        attribution: '© Esri © USGS © NASA'
+        attribution: '© Esri © USGS © NASA',
+        maxzoom: 17
       }
     },
     layers: [
@@ -70,6 +70,8 @@ interface MapContainerProps {
   selectedPropertyId: string | null;
   hoveredPropertyId: string | null;
   onViewFullDetails?: (property: Property) => void;
+  savedPropertyIds: string[];
+  onToggleSave: (propertyId: string) => void;
 }
 
 export default function MapContainer({
@@ -82,7 +84,9 @@ export default function MapContainer({
   onPinClick,
   selectedPropertyId,
   hoveredPropertyId,
-  onViewFullDetails
+  onViewFullDetails,
+  savedPropertyIds,
+  onToggleSave
 }: MapContainerProps) {
   const mapContainerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<maplibregl.Map | null>(null);
@@ -90,11 +94,11 @@ export default function MapContainer({
   const [mapLoaded, setMapLoaded] = React.useState(false);
 
   // Viewport checks for responsive layouts
-  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 640);
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
 
   React.useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 640);
+      setIsMobile(window.innerWidth < 768);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -143,8 +147,8 @@ export default function MapContainer({
   const autoPanningRef = React.useRef(false);
 
   // Synchronized portal targets state for drawing React custom pins as MapLibre markers
-  const [portalTargets, setPortalTargets] = React.useState<Map<string, { el: HTMLElement; cluster: PropertyCluster }>>(new Map());
-  const portalTargetsRef = React.useRef<Map<string, { el: HTMLElement; cluster: PropertyCluster }>>(new Map());
+  const [portalTargets, setPortalTargets] = React.useState<Map<string, { el: HTMLElement; property: Property }>>(new Map());
+  const portalTargetsRef = React.useRef<Map<string, { el: HTMLElement; property: Property }>>(new Map());
   const markerInstancesRef = React.useRef<Map<string, maplibregl.Marker>>(new Map());
 
 
@@ -176,7 +180,7 @@ export default function MapContainer({
       center: ootyCenter,
       zoom: defaultZoom,
       minZoom: 8.5, // Relaxed minZoom to let users zoom out and see neighboring regions dimmed
-      maxZoom: 18,
+      maxZoom: activeStyle === 'satellite' ? 17 : 18,
       maxBounds: ootyMaxBounds,
       dragPan: true,
       scrollZoom: true,
@@ -341,11 +345,58 @@ export default function MapContainer({
     if (!map || !mapLoaded) return;
 
     if (activeStyle === 'satellite') {
-      map.setStyle(getSatelliteStyle());
-    } else if (activeStyle === 'dark') {
-      map.setStyle('https://tiles.openfreemap.org/styles/darkliberty');
+      fetch('https://tiles.openfreemap.org/styles/liberty')
+        .then(res => res.json())
+        .then(style => {
+          style.sources['esri-satellite'] = {
+            type: 'raster',
+            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+            tileSize: 256,
+            maxzoom: 17
+          };
+          
+          const symbolLayers = style.layers.filter((l: any) => l.type === 'symbol');
+          symbolLayers.forEach((l: any) => {
+            if (!l.paint) l.paint = {};
+            l.paint['text-color'] = '#FFFFFF';
+            l.paint['text-halo-color'] = 'rgba(0, 0, 0, 0.85)';
+            l.paint['text-halo-width'] = 1;
+            l.paint['text-halo-blur'] = 1;
+          });
+          
+          style.layers = [
+            {
+              id: 'esri-satellite-layer',
+              type: 'raster',
+              source: 'esri-satellite',
+              minzoom: 0,
+              maxzoom: 20
+            },
+            ...symbolLayers
+          ];
+          
+          map.setStyle(style);
+        })
+        .catch(err => {
+          console.error("Failed to load hybrid style", err);
+          map.setStyle(getSatelliteStyle());
+        });
+
+      if (map.getZoom() > 17) {
+        map.easeTo({ zoom: 17, duration: 800 });
+        setTimeout(() => {
+          if (mapRef.current) mapRef.current.setMaxZoom(17);
+        }, 850);
+      } else {
+        map.setMaxZoom(17);
+      }
     } else {
-      map.setStyle('https://tiles.openfreemap.org/styles/liberty');
+      map.setMaxZoom(18);
+      if (activeStyle === 'dark') {
+        map.setStyle('https://tiles.openfreemap.org/styles/darkliberty');
+      } else {
+        map.setStyle('https://tiles.openfreemap.org/styles/liberty');
+      }
     }
   }, [activeStyle, mapLoaded]);
 
@@ -374,34 +425,9 @@ export default function MapContainer({
     }
   }, [showSpotlight, mapLoaded]);
 
-  // Zoom or zoom + fly to clusters
-  const handleClusterClick = (cluster: PropertyCluster) => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (cluster.isCluster) {
-      const lats = cluster.properties.map((p) => p.latitude);
-      const lngs = cluster.properties.map((p) => p.longitude);
-      const minLat = Math.min(...lats);
-      const maxLat = Math.max(...lats);
-      const minLng = Math.min(...lngs);
-      const maxLng = Math.max(...lngs);
-
-      map.fitBounds(
-        [
-          [minLng - 0.015, minLat - 0.015], // Southwest with cushions
-          [maxLng + 0.015, maxLat + 0.015]  // Northeast with cushions
-        ],
-        {
-          padding: { top: 120, bottom: 120, left: 100, right: 100 },
-          duration: 900,
-          maxZoom: 15.5
-        }
-      );
-    } else {
-      const prop = cluster.properties[0];
-      onPinClick(prop);
-    }
+  // Zoom or fly to property
+  const handlePinClickEvent = (property: Property) => {
+    onPinClick(property);
   };
 
   // Synchronize MapLibre custom markers
@@ -410,10 +436,9 @@ export default function MapContainer({
     if (!map || !mapLoaded) return;
 
     const syncMarkers = () => {
-      const activeClusters = getClusters(properties, map, 65);
-      const currentTargets = new Map<string, { el: HTMLElement; cluster: PropertyCluster }>(portalTargetsRef.current);
-      const nextTargets = new Map<string, { el: HTMLElement; cluster: PropertyCluster }>();
-      const activeIds = new Set(activeClusters.map((c) => c.id));
+      const currentTargets = new Map<string, { el: HTMLElement; property: Property }>(portalTargetsRef.current);
+      const nextTargets = new Map<string, { el: HTMLElement; property: Property }>();
+      const activeIds = new Set(properties.map((p) => p.id));
 
       // Remove obsolete markers
       for (const [id, target] of currentTargets.entries()) {
@@ -429,24 +454,24 @@ export default function MapContainer({
       }
 
       // Add or update markers
-      for (const cluster of activeClusters) {
-        if (!nextTargets.has(cluster.id)) {
+      for (const property of properties) {
+        if (!nextTargets.has(property.id)) {
           const el = document.createElement('div');
           el.className = 'maplibre-custom-marker-wrapper';
 
-          const anchor = cluster.isCluster ? 'center' : 'bottom';
+          const anchor = 'bottom';
           const marker = new maplibregl.Marker({ element: el, anchor })
-            .setLngLat([cluster.longitude, cluster.latitude])
+            .setLngLat([property.longitude, property.latitude])
             .addTo(map);
 
-          markerInstancesRef.current.set(cluster.id, marker);
-          nextTargets.set(cluster.id, { el, cluster });
+          markerInstancesRef.current.set(property.id, marker);
+          nextTargets.set(property.id, { el, property });
         } else {
-          const target = nextTargets.get(cluster.id)!;
-          target.cluster = cluster;
-          const marker = markerInstancesRef.current.get(cluster.id);
+          const target = nextTargets.get(property.id)!;
+          target.property = property;
+          const marker = markerInstancesRef.current.get(property.id);
           if (marker) {
-            marker.setLngLat([cluster.longitude, cluster.latitude]);
+            marker.setLngLat([property.longitude, property.latitude]);
           }
         }
       }
@@ -567,13 +592,13 @@ export default function MapContainer({
         id="maplibre-canvas-viewport"
       />
 
-      {/* Render portals for all active custom markers/clusters */}
+      {/* Render portals for all active custom markers */}
       {Array.from(portalTargets.entries()).map(([id, target]) => {
         return createPortal(
           <CustomMarker
             key={`marker-${id}`}
-            cluster={target.cluster}
-            onClick={() => handleClusterClick(target.cluster)}
+            property={target.property}
+            onClick={() => handlePinClickEvent(target.property)}
             selectedPropertyId={selectedPropertyId}
             hoveredPropertyId={hoveredPinVisible ? hoveredPropertyId : null}
           />,
@@ -602,6 +627,8 @@ export default function MapContainer({
               }
             }}
             isMobile={false}
+            savedPropertyIds={savedPropertyIds}
+            onToggleSave={onToggleSave}
           />
         </div>
       )}

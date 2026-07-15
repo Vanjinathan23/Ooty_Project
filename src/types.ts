@@ -14,7 +14,7 @@ export interface SearchResultStub {
   coords: [number, number];
 }
 
-export type PropertyType = 'land' | 'resort' | 'tea_estate';
+export type PropertyType = 'flat' | 'land' | 'resort' | 'tea_estate';
 export type PropertyStatus = 'available' | 'booked' | 'sold';
 
 export interface DocumentInfo {
@@ -34,6 +34,8 @@ export interface Property {
   longitude: number;
   plotAreaSqft?: number;
   builtUpAreaSqft?: number;
+  bhk?: number;
+  floorNumber?: number;
   amenities: string[];
   images: string[];
   documents: DocumentInfo[];
@@ -42,5 +44,5 @@ export interface Property {
   pinCategory: PropertyType;
   pinIcon: string;
   videoUrl?: string;
+  is_published?: boolean;
 }
-
