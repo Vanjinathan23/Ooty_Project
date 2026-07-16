@@ -16,8 +16,8 @@ export default function AuthModal({ isOpen, onClose, message }: AuthModalProps) 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Directs user back to the current app url
-          redirectTo: window.location.origin
+          // Directs user back to the app url via environment variable or current window origin
+          redirectTo: import.meta.env.VITE_APP_URL || window.location.origin
         }
       });
       if (error) throw error;

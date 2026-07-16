@@ -70,7 +70,7 @@ export default function AdminLogin({ onLoginSuccess, currentPath, setNavigation 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/admin`
+          redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/admin`
         }
       });
       if (error) throw error;
